@@ -1,0 +1,10 @@
+python-dotenv
+chainlit
+llama-index>=0.10.0
+llama-index-llms-ollama
+llama-index-embeddings-huggingface
+nltk
+ollama
+transformers
+torch
+sentence-transformers
