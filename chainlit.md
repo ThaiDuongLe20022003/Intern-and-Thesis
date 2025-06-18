@@ -1,14 +1,12 @@
-# Welcome to Chainlit! 🚀🤖
+# Welcome to DeepLaw Chatbot! 🚀🤖
 
-Hi there, Developer! 👋 We're excited to have you on board. Chainlit is a powerful tool designed to help you prototype, debug and share applications built on top of LLMs.
+Hi there, Law Student and Legal Enthusiast! 👋 This intelligent assistant is designed to help you explore and understand legal concepts, with a particular focus on Vietnam’s Law on Cyberinformation Security (2015) and Law on Cybersecurity (2018). Whether you're preparing for a legal exam or just curious about how digital information is protected under the law, this chatbot is here to support your learning.
+
+You can begin by asking questions like those found in the starter suggestions. But don't stop there—feel free to inquire about legal definitions, enforcement measures, or how these laws affect individuals and organizations. For example, you might ask, "What are the key principles of the Law on Cybersecurity 2018?" or "How does the Law on Cyberinformation Security regulate personal data?"
+
+Jump in and explore the legal safeguards of the digital world! 📚⚖️
 
 ## Useful Links 🔗
 
-- **Documentation:** Get started with our comprehensive [Chainlit Documentation](https://docs.chainlit.io) 📚
-- **Discord Community:** Join our friendly [Chainlit Discord](https://discord.gg/k73SQ3FyUh) to ask questions, share your projects, and connect with other developers! 💬
-
-We can't wait to see what you create with Chainlit! Happy coding! 💻😊
-
-## Welcome screen
-
-To modify the welcome screen, edit the `chainlit.md` file at the root of your project. If you do not want a welcome screen, just leave this file empty.
+- **Github** Out source code [DeepLaw Chatbot](https://github.com/ThaiDuongLe20022003/Intern-and-Thesis) 💻😊
+- **Law** If you are interested in Law on the Cyberinformation Security 2015 and Cybersecurity 2018, you can find it [here](https://github.com/ThaiDuongLe20022003/Intern-and-Thesis/tree/main/data) 📚
