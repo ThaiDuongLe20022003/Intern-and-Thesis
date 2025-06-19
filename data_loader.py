@@ -14,18 +14,18 @@ nest_asyncio.apply()
 nltk.download('punkt_tab')
 nltk.download('averaged_perceptron_tagger_eng')
 
-# Cấu hình LLM và Embedding
+# LLM and Embedding models setting
 Settings.llm = Ollama(model="deepseek-r1:1.5b", request_timeout=120.0)
 Settings.embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-small-en-v1.5")
 
 reader = SimpleDirectoryReader(input_dir="./data")
 documents = reader.load_data()
 
-# Cấu hình chunk size
+# Chunk size setting
 Settings.chunk_size = 512
 storage_context = StorageContext.from_defaults()
 
-# Tạo index với cài đặt mới
+# Index creation
 index = VectorStoreIndex.from_documents(
     documents,
     storage_context=storage_context,

@@ -15,7 +15,7 @@ STORAGE_DIR = "./storage"
 CHAT_FILE_PATH = "./chat/chat_store.json"
 DATA_DIR = "./data"
 
-# Cấu hình model
+# Model Setting
 Settings.llm = Ollama(model = "deepseek-r1:1.5b", temperature = 0.1, request_timeout = 120.0)
 Settings.embed_model = HuggingFaceEmbedding(model_name = "BAAI/bge-small-en-v1.5")
 
@@ -52,7 +52,8 @@ async def start():
             query_engine=index.as_query_engine(),
             metadata=ToolMetadata(
                 name = "law", 
-                description = "Useful for answering queries about the Law on Cyberinformation Security 2015 and Law on Cybersecurity 2018."
+                description = "Useful for answering queries about the Law on Cyberinformation Security 2015 and" \
+                " Law on Cybersecurity 2018."
             )
         )
     ]
@@ -67,18 +68,20 @@ async def start():
             query_engine = query_engine,
             metadata = ToolMetadata(
                 name = "sub_question_query_engine",
-                description = "Useful for answering detailed queries about the Law on Cyberinformation Security 2015 and Law on Cybersecurity 2018."
+                description = "Useful for answering detailed queries about the Law on Cyberinformation Security 2015 and" \
+                " Law on Cybersecurity 2018."
             )
         )
     ]
 
-    # Sử dụng ReActAgent từ core
+    # ReActAgent from core
     agent = ReActAgent.from_tools(
         tools, 
         llm = Settings.llm,
         memory = chat_memory,
         verbose = True,
-        system_prompt = "You are a professional legal expert. Always cite based the Law on Cyberinformation Security 2015 and Law on Cybersecurity 2018; and answer concisely."
+        system_prompt = "You are a professional legal expert. Always cite based the Law on Cyberinformation Security 2015 and" \
+        " Law on Cybersecurity 2018; and answer concisely."
     )
     
     cl.user_session.set("agent", agent)
