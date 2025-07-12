@@ -1,33 +1,84 @@
 import os
-from pathlib import Path
-import nltk
-import nest_asyncio
-from llama_index.core import SimpleDirectoryReader
-from llama_index.core import VectorStoreIndex, StorageContext
-from llama_index.core import Settings
-from llama_index.llms.ollama import Ollama
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-
-
+import nest_asyncio  # noqa: E402
 nest_asyncio.apply()
 
-nltk.download('punkt_tab')
-nltk.download('averaged_perceptron_tagger_eng')
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.embeddings.fastembed import FastEmbedEmbeddings
+from langchain_qdrant import QdrantVectorStore
+from langchain_community.document_loaders import DirectoryLoader
+from llama_parse import LlamaParse
+from llama_index.core import SimpleDirectoryReader
 
-# LLM and Embedding models setting
-Settings.llm = Ollama(model="deepseek-r1:1.5b", request_timeout=120.0)
-Settings.embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-small-en-v1.5")
+# bring in our QDRANT_URL_LOCALHOST
+from dotenv import load_dotenv
+load_dotenv()
 
-reader = SimpleDirectoryReader(input_dir="./data")
-documents = reader.load_data()
 
-# Chunk size setting
-Settings.chunk_size = 512
-storage_context = StorageContext.from_defaults()
+qdrant_url = os.getenv("QDRANT_URL_LOCALHOST")
+llamaparse_api_key = os.getenv("LLAMA_CLOUD_API_KEY")
+chunk_size = 500
+chunk_overlap = 50
 
-# Index creation
-index = VectorStoreIndex.from_documents(
-    documents,
-    storage_context=storage_context,
-)
-storage_context.persist(persist_dir="./storage/")
+
+import pickle
+# Define a function to load parsed data if available, or parse if not
+def load_or_parse_data():
+    data_file = "./data/parsed_data.pkl"
+    
+    if os.path.exists(data_file):
+        # Load the parsed data from the file
+        with open(data_file, "rb") as f:
+            parsed_data = pickle.load(f)
+    else:
+        # Perform the parsing step and store the result in llama_parse_documents
+        parser = LlamaParse(api_key=llamaparse_api_key, result_type="markdown")
+        file_extractor = {".pdf": parser}
+        llama_parse_documents = SimpleDirectoryReader("./data", file_extractor=file_extractor).load_data()
+        
+
+        # Save the parsed data to a file
+        with open(data_file, "wb") as f:
+            pickle.dump(llama_parse_documents, f)
+        
+        # Set the parsed data to the variable
+        parsed_data = llama_parse_documents
+    
+    return parsed_data
+            
+
+# Create vector database
+def create_vector_database():
+    
+     # Call the function to either load or parse the data
+    llama_parse_documents = load_or_parse_data()
+    #print(llama_parse_documents)
+    print(llama_parse_documents[0].text[:100])
+    
+    with open('data/output.md', 'w', encoding='utf-8') as f:
+        for doc in llama_parse_documents:
+            f.write(doc.text + '\n')
+    
+    loader = DirectoryLoader('data/', glob="**/*.md", show_progress=True)
+    
+    # Split loaded documents into chunks
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+    documents = loader.load()
+    splits = text_splitter.split_documents(documents)
+    
+    
+    # Initialize Embeddings
+    embeddings = FastEmbedEmbeddings()
+    
+    # Create and persist a Chroma vector database from the chunked documents
+    vectorstore = QdrantVectorStore.from_documents(
+        documents=splits,
+        embedding=embeddings,
+        url=qdrant_url,
+        collection_name="deeplaw",
+    )
+    
+    print('Vector DB created successfully !')
+
+
+if __name__ == "__main__":
+    create_vector_database()

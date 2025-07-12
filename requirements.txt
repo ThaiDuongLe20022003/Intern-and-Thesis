@@ -1,5 +1,5 @@
 chainlit
-llama-index>=0.10.0
+llama-index
 llama-index-llms-ollama
 llama-index-embeddings-huggingface
 nltk

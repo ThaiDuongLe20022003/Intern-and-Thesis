@@ -1,90 +1,100 @@
 import os
 import chainlit as cl
-from llama_index.core import StorageContext, Settings, VectorStoreIndex, SimpleDirectoryReader
-from llama_index.core import load_index_from_storage
-from llama_index.llms.ollama import Ollama
-from llama_index.core.query_engine import SubQuestionQueryEngine
-from llama_index.core.tools import QueryEngineTool, ToolMetadata
+from langchain_core.documents import Document as LCDocument
+from langchain.prompts import ChatPromptTemplate
+from langchain.schema.runnable import RunnableConfig
+from langchain.schema import StrOutputParser
+from qdrant_client import QdrantClient
+from langchain_community.embeddings.fastembed import FastEmbedEmbeddings
+from langchain_qdrant import QdrantVectorStore
+from langchain_ollama import OllamaLLM
 from llama_index.core.storage.chat_store import SimpleChatStore
-# Sửa import này - sử dụng ReActAgent từ core
-from llama_index.core.agent import ReActAgent
 from llama_index.core.memory import ChatMemoryBuffer
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+from dotenv import load_dotenv
+from llama_index.core.llms import ChatMessage
+from operator import itemgetter
 
-STORAGE_DIR = "./storage"
-CHAT_FILE_PATH = "./chat/chat_store.json"
-DATA_DIR = "./data"
+# Load environment variables
+load_dotenv()
 
-# Model Setting
-Settings.llm = Ollama(model = "deepseek-r1:1.5b", temperature = 0.1, request_timeout = 120.0)
-Settings.embed_model = HuggingFaceEmbedding(model_name = "BAAI/bge-small-en-v1.5")
+# Model Settings
+ollama_model = "deepseek-llm:latest"
+qdrant_url = os.getenv("QDRANT_URL_LOCALHOST")
+collection_name = "deeplaw"
 
-def ensure_index():
-    if not os.path.exists(STORAGE_DIR) or not os.listdir(STORAGE_DIR):
-        documents = SimpleDirectoryReader(DATA_DIR).load_data()
-        index = VectorStoreIndex.from_documents(documents)
-        index.storage_context.persist(persist_dir = STORAGE_DIR)
-    else:
-        storage_context = StorageContext.from_defaults(persist_dir = STORAGE_DIR)
-        index = load_index_from_storage(storage_context)
-    return index
+# Define custom prompt template with history
+custom_prompt_template = """You are a professional legal expert. Always cite based the Law on Cyberinformation Security 2015 and Law on Cybersecurity 2018; and answer concisely.
+
+Use the following pieces of information and conversation history (if any) to answer the user's question.
+If you don't know the answer, just say that you don't know, don't try to make up an answer.
+
+Context: {context}
+
+Conversation History (if any):
+{history}
+
+Question: {question}
+
+Helpful answer:
+"""
+
+def format_docs(docs: list[LCDocument]) -> str:
+    """Format documents for context"""
+    return "\n\n".join(doc.page_content for doc in docs)
+
+def format_history(messages: list[ChatMessage]) -> str:
+    """Format chat history for context"""
+    history_str = ""
+    for msg in messages:
+        if msg.role == "user":
+            history_str += f"User: {msg.content}\n"
+        elif msg.role == "assistant":
+            history_str += f"Assistant: {msg.content}\n"
+    return history_str.strip()
 
 @cl.on_chat_start
 async def start():
-    index = ensure_index()
+    # Initialize Qdrant client and vector store
+    client = QdrantClient(url=qdrant_url)
+    embeddings = FastEmbedEmbeddings()
+    
+    vectorstore = QdrantVectorStore(
+        client=client,
+        collection_name=collection_name,
+        embedding=embeddings
+    )
+    retriever = vectorstore.as_retriever()
 
+    # Initialize LLM
+    llm = OllamaLLM(model=ollama_model, temperature=0)
+    
+    # Create RAG chain (will be completed in on_message)
+    cl.user_session.set("retriever", retriever)
+    cl.user_session.set("llm", llm)
+    
+    # Set up chat history
+    CHAT_FILE_PATH = "./chat/chat_store.json"
+    chat_store = SimpleChatStore()
+    
+    # Create chat directory if it doesn't exist
+    os.makedirs(os.path.dirname(CHAT_FILE_PATH), exist_ok=True)
+    
+    # Load existing chat history if available
     if os.path.exists(CHAT_FILE_PATH) and os.path.getsize(CHAT_FILE_PATH) > 0:
         try:
             chat_store = SimpleChatStore.from_persist_path(CHAT_FILE_PATH)
         except:
+            # Create new store if loading fails
             chat_store = SimpleChatStore()
-    else:
-        chat_store = SimpleChatStore()
 
     chat_memory = ChatMemoryBuffer.from_defaults(
-        token_limit = 1500,
-        chat_store = chat_store,
-        chat_store_key = "user"
-    )
-
-    individual_query_engine_tools = [
-        QueryEngineTool(
-            query_engine=index.as_query_engine(),
-            metadata=ToolMetadata(
-                name = "law", 
-                description = "Useful for answering queries about the Law on Cyberinformation Security 2015 and" \
-                " Law on Cybersecurity 2018."
-            )
-        )
-    ]
-
-    query_engine = SubQuestionQueryEngine.from_defaults(
-        query_engine_tools = individual_query_engine_tools,
-        llm = Settings.llm,
-    )
-
-    tools = individual_query_engine_tools + [
-        QueryEngineTool(
-            query_engine = query_engine,
-            metadata = ToolMetadata(
-                name = "sub_question_query_engine",
-                description = "Useful for answering detailed queries about the Law on Cyberinformation Security 2015 and" \
-                " Law on Cybersecurity 2018."
-            )
-        )
-    ]
-
-    # ReActAgent from core
-    agent = ReActAgent.from_tools(
-        tools, 
-        llm = Settings.llm,
-        memory = chat_memory,
-        verbose = True,
-        system_prompt = "You are a professional legal expert. Always cite based the Law on Cyberinformation Security 2015 and" \
-        " Law on Cybersecurity 2018; and answer concisely."
+        token_limit=1500,
+        chat_store=chat_store,
+        chat_store_key="user"
     )
     
-    cl.user_session.set("agent", agent)
+    # Store objects in user session
+    cl.user_session.set("chat_memory", chat_memory)
     cl.user_session.set("chat_store", chat_store)
 
 @cl.on_chat_resume
@@ -100,17 +110,55 @@ def auth_callback(username: str, password: str):
 
 @cl.on_message
 async def main(message: cl.Message):
-    agent = cl.user_session.get("agent")
+    # Retrieve objects from session
+    retriever = cl.user_session.get("retriever")
+    llm = cl.user_session.get("llm")
+    chat_memory = cl.user_session.get("chat_memory")
     chat_store = cl.user_session.get("chat_store")
-
-    msg = cl.Message(content="", author="Assistant")
-    response = await agent.astream_chat(message.content)
     
-    async for token in response.async_response_gen():
-        await msg.stream_token(token)
-        
+    # Get conversation history
+    history_messages = chat_memory.get()
+    history_str = format_history(history_messages)
+    
+    # Create RAG chain with history
+    prompt = ChatPromptTemplate.from_template(custom_prompt_template)
+    runnable = (
+        {
+            "context": itemgetter("question") | retriever | format_docs,
+            "history": itemgetter("history"),
+            "question": itemgetter("question")
+        }
+        | prompt
+        | llm
+        | StrOutputParser()
+    )
+    
+    # Add user message to memory
+    chat_memory.put(ChatMessage(role="user", content=message.content))
+    
+    # Generate response
+    msg = cl.Message(content="")
+    response = ""
+    
+    # Create input with history
+    inputs = {
+        "question": message.content,
+        "history": history_str
+    }
+    
+    async for chunk in runnable.astream(
+        inputs,
+        config=RunnableConfig(callbacks=[cl.LangchainCallbackHandler()])
+    ):
+        await msg.stream_token(chunk)
+        response += chunk
+    
+    # Add assistant response to memory
+    chat_memory.put(ChatMessage(role="assistant", content=response))
+    
+    # Finalize and persist
     await msg.send()
-    chat_store.persist(persist_path = CHAT_FILE_PATH)
+    chat_store.persist(persist_path="./chat/chat_store.json")
 
 if __name__ == "__main__":
     cl.run(main)
