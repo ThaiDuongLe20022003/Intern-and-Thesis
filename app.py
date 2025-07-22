@@ -18,24 +18,25 @@ from operator import itemgetter
 load_dotenv()
 
 # Model Settings
-ollama_model = "deepseek-llm:latest"
+ollama_model = "deepseek-r1:latest"
 qdrant_url = os.getenv("QDRANT_URL_LOCALHOST")
 collection_name = "deeplaw"
 
 # Define custom prompt template with history
-custom_prompt_template = """You are a professional legal expert. Always cite based the Law on Cyberinformation Security 2015 and Law on Cybersecurity 2018; and answer concisely.
+custom_prompt_template = """You are a Vietnamese professional legal expert. 
+Use ONLY the provided context from Law on Cyberinformation Security 2015 and Law on Cyber Security 2018 and conversation history (if any) to:
 
-Use the following pieces of information and conversation history (if any) to answer the user's question.
-If you don't know the answer, just say that you don't know, don't try to make up an answer.
+1. Identify relevant chapters, sections, articles and clauses from which law.
+2. Quote exact legal text when possible.
+3. Provide chapter, section, article and clause numbers from which law for reference.
+4. If information is not in context, say "I don't have information about this specific provision".
 
 Context: {context}
 
-Conversation History (if any):
-{history}
+Conversation History (if any): {history}
 
 Question: {question}
 
-Helpful answer:
 """
 
 def format_docs(docs: list[LCDocument]) -> str:

@@ -1,11 +1,10 @@
 import os
-import nest_asyncio  # noqa: E402
+import nest_asyncio  
 nest_asyncio.apply()
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.embeddings.fastembed import FastEmbedEmbeddings
 from langchain_qdrant import QdrantVectorStore
-from langchain_community.document_loaders import DirectoryLoader
 from llama_parse import LlamaParse
 from llama_index.core import SimpleDirectoryReader
 
@@ -16,8 +15,8 @@ load_dotenv()
 
 qdrant_url = os.getenv("QDRANT_URL_LOCALHOST")
 llamaparse_api_key = os.getenv("LLAMA_CLOUD_API_KEY")
-chunk_size = 500
-chunk_overlap = 50
+chunk_size = 1200
+chunk_overlap = 200
 
 
 import pickle
@@ -51,18 +50,40 @@ def create_vector_database():
     
      # Call the function to either load or parse the data
     llama_parse_documents = load_or_parse_data()
-    #print(llama_parse_documents)
-    print(llama_parse_documents[0].text[:100])
-    
+
     with open('data/output.md', 'w', encoding='utf-8') as f:
         for doc in llama_parse_documents:
-            f.write(doc.text + '\n')
+            f.write(doc.text.replace('\n', '  \n'))
     
-    loader = DirectoryLoader('data/', glob="**/*.md", show_progress=True)
+    from langchain_core.documents import Document
+    documents = []
+    for doc in llama_parse_documents:
+        documents.append(
+            Document(
+                page_content=doc.text,
+                metadata={
+                    "source": "new_Law.pdf",
+                    "page": doc.metadata.get("page_label", 0),  # Giữ số trang
+                    "section": doc.metadata.get("section", ""),
+                }
+            )
+        )
     
     # Split loaded documents into chunks
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
-    documents = loader.load()
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+        separators = [
+            "\n\n===== Page",  # Phân tách theo trang
+            "\n\nChapter",    # Phân tách theo chương
+            "\n\nArticle",     # Phân tách theo điều
+            "\n\nSection",     # Phân tách theo mục
+            "\n\n",
+            "\n",
+            " ",
+            ""
+        ]
+    )
     splits = text_splitter.split_documents(documents)
     
     
