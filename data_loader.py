@@ -30,9 +30,9 @@ def load_or_parse_data():
             parsed_data = pickle.load(f)
     else:
         # Perform the parsing step and store the result in llama_parse_documents
-        parser = LlamaParse(api_key=llamaparse_api_key, result_type="markdown")
+        parser = LlamaParse(api_key = llamaparse_api_key, result_type = "markdown")
         file_extractor = {".pdf": parser}
-        llama_parse_documents = SimpleDirectoryReader("./data", file_extractor=file_extractor).load_data()
+        llama_parse_documents = SimpleDirectoryReader("./data", file_extractor = file_extractor).load_data()
         
 
         # Save the parsed data to a file
@@ -51,7 +51,7 @@ def create_vector_database():
      # Call the function to either load or parse the data
     llama_parse_documents = load_or_parse_data()
 
-    with open('data/output.md', 'w', encoding='utf-8') as f:
+    with open('data/output.md', 'w', encoding = 'utf-8') as f:
         for doc in llama_parse_documents:
             f.write(doc.text.replace('\n', '  \n'))
     
@@ -60,10 +60,10 @@ def create_vector_database():
     for doc in llama_parse_documents:
         documents.append(
             Document(
-                page_content=doc.text,
+                page_content = doc.text,
                 metadata={
-                    "source": "new_Law.pdf",
-                    "page": doc.metadata.get("page_label", 0),  # Giữ số trang
+                    "source": os.path.basename(doc.metadata["file_path"]),  
+                    "page": doc.metadata.get("page_label", 0),
                     "section": doc.metadata.get("section", ""),
                 }
             )
@@ -71,13 +71,13 @@ def create_vector_database():
     
     # Split loaded documents into chunks
     text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=chunk_size,
-        chunk_overlap=chunk_overlap,
+        chunk_size = chunk_size,
+        chunk_overlap = chunk_overlap,
         separators = [
-            "\n\n===== Page",  # Phân tách theo trang
-            "\n\nChapter",    # Phân tách theo chương
-            "\n\nArticle",     # Phân tách theo điều
-            "\n\nSection",     # Phân tách theo mục
+            "\n\n===== Page",  
+            "\n\nChapter",    
+            "\n\nArticle",     
+            "\n\nSection",     
             "\n\n",
             "\n",
             " ",
@@ -92,10 +92,10 @@ def create_vector_database():
     
     # Create and persist a Chroma vector database from the chunked documents
     vectorstore = QdrantVectorStore.from_documents(
-        documents=splits,
-        embedding=embeddings,
-        url=qdrant_url,
-        collection_name="deeplaw",
+        documents = splits,
+        embedding = embeddings,
+        url = qdrant_url,
+        collection_name = "deeplaw",
     )
     
     print('Vector DB created successfully !')

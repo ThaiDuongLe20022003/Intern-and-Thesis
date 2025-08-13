@@ -24,12 +24,17 @@ collection_name = "deeplaw"
 
 # Define custom prompt template with history
 custom_prompt_template = """You are a Vietnamese professional legal expert. 
-Use ONLY the provided context from Law on Cyberinformation Security 2015 and Law on Cyber Security 2018 and conversation history (if any) to:
+Use ONLY the provided context from:
+- Law on Cyberinformation Security 2015
+- Law on Cyber Security 2018
+- Conversation history (if any) 
 
-1. Identify relevant chapters, sections, articles and clauses from which law.
-2. Quote exact legal text when possible.
-3. Provide chapter, section, article and clause numbers from which law for reference.
-4. If information is not in context, say "I don't have information about this specific provision".
+For every answer:
+- Cite exact Article/Chapter/Section numbers. 
+- Quote the verbatim legal text when possible.
+- Never add interpretations or examples unless explicitly asked.
+- If information is not in context, say "I don't have information about this specific provision".
+
 
 Context: {context}
 
@@ -56,18 +61,18 @@ def format_history(messages: list[ChatMessage]) -> str:
 @cl.on_chat_start
 async def start():
     # Initialize Qdrant client and vector store
-    client = QdrantClient(url=qdrant_url)
+    client = QdrantClient(url = qdrant_url)
     embeddings = FastEmbedEmbeddings()
     
     vectorstore = QdrantVectorStore(
-        client=client,
-        collection_name=collection_name,
-        embedding=embeddings
+        client = client,
+        collection_name = collection_name,
+        embedding = embeddings
     )
     retriever = vectorstore.as_retriever()
 
     # Initialize LLM
-    llm = OllamaLLM(model=ollama_model, temperature=0)
+    llm = OllamaLLM(model = ollama_model, temperature = 0)
     
     # Create RAG chain (will be completed in on_message)
     cl.user_session.set("retriever", retriever)
@@ -78,7 +83,7 @@ async def start():
     chat_store = SimpleChatStore()
     
     # Create chat directory if it doesn't exist
-    os.makedirs(os.path.dirname(CHAT_FILE_PATH), exist_ok=True)
+    os.makedirs(os.path.dirname(CHAT_FILE_PATH), exist_ok = True)
     
     # Load existing chat history if available
     if os.path.exists(CHAT_FILE_PATH) and os.path.getsize(CHAT_FILE_PATH) > 0:
@@ -89,9 +94,9 @@ async def start():
             chat_store = SimpleChatStore()
 
     chat_memory = ChatMemoryBuffer.from_defaults(
-        token_limit=1500,
-        chat_store=chat_store,
-        chat_store_key="user"
+        token_limit = 1500,
+        chat_store = chat_store,
+        chat_store_key = "user"
     )
     
     # Store objects in user session
@@ -106,7 +111,7 @@ async def resume():
 def auth_callback(username: str, password: str):
     users = {"Duong": "10421012"}
     if username in users and users[username] == password:
-        return cl.User(identifier=username, metadata={"role": username, "provider": "credentials"})
+        return cl.User(identifier = username, metadata = {"role": username, "provider": "credentials"})
     return None
 
 @cl.on_message
@@ -135,10 +140,10 @@ async def main(message: cl.Message):
     )
     
     # Add user message to memory
-    chat_memory.put(ChatMessage(role="user", content=message.content))
+    chat_memory.put(ChatMessage(role = "user", content = message.content))
     
     # Generate response
-    msg = cl.Message(content="")
+    msg = cl.Message(content = "")
     response = ""
     
     # Create input with history
@@ -149,17 +154,17 @@ async def main(message: cl.Message):
     
     async for chunk in runnable.astream(
         inputs,
-        config=RunnableConfig(callbacks=[cl.LangchainCallbackHandler()])
+        config = RunnableConfig(callbacks = [cl.LangchainCallbackHandler()])
     ):
         await msg.stream_token(chunk)
         response += chunk
     
     # Add assistant response to memory
-    chat_memory.put(ChatMessage(role="assistant", content=response))
+    chat_memory.put(ChatMessage(role = "assistant", content = response))
     
     # Finalize and persist
     await msg.send()
-    chat_store.persist(persist_path="./chat/chat_store.json")
+    chat_store.persist(persist_path = "./chat/chat_store.json")
 
 if __name__ == "__main__":
     cl.run(main)
